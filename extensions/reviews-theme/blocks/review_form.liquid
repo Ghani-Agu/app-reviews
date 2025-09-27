@@ -1,0 +1,43 @@
+{% comment %}
+App Reviews – submission form (posts to App Proxy)
+Action must match your [app_proxy] config:
+  storefront URL: /apps/app-reviews/submit
+  server route:   /reviews/submit
+{% endcomment %}
+
+<form method="post"
+      action="/apps/app-reviews/submit"
+      class="app-reviews-form"
+      style="display:grid;gap:10px;max-width:520px">
+
+  <!-- Send the Product GID so the server doesn’t need to convert -->
+  <input type="hidden" name="product_id" value="{{ product.admin_graphql_api_id }}">
+  <!-- So the server knows where to send you back -->
+  <input type="hidden" name="return_to"   value="{{ product.url }}">
+
+  <label>
+    Rating
+    <select name="rating" required>
+      <option value="">Choose…</option>
+      {% for i in (1..5) %}
+        <option value="{{ i }}">{{ i }}</option>
+      {% endfor %}
+    </select>
+  </label>
+
+  <label> Title <input name="title" maxlength="120"> </label>
+  <label> Your review <textarea name="body" rows="5" required></textarea> </label>
+  <label> Name <input name="author" required> </label>
+  <label> Email <input type="email" name="email" required> </label>
+
+  <button type="submit">Submit review</button>
+  <small>By submitting you agree to have this review shown on the product page.</small>
+</form>
+
+{% schema %}
+{
+  "name": "Submit Review",
+  "target": "section",
+  "settings": []
+}
+{% endschema %}

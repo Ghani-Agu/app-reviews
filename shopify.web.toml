@@ -1,0 +1,7 @@
+name = "Web Server"
+roles = ["backend"]
+webhooks_path = "/webhooks/app/uninstalled"
+
+[commands]
+predev = "npx prisma generate"
+dev = "tsx watch web/index.ts"

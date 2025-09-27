@@ -1,0 +1,41 @@
+{% comment %}
+Block: App Reviews — displays one Review metaobject selected in block settings.
+{% endcomment %}
+
+{% assign rev = block.settings.review %}
+
+{% if rev %}
+  <div class="app-reviews" style="padding:8px; border:1px dashed #e5e7eb; border-radius:6px;">
+    {% comment %} Stars (simple text stars) {% endcomment %}
+    {% assign n = rev.rating.value | default: 0 | plus: 0 %}
+    <div aria-label="{{ n }} out of 5 stars">
+      {% for i in (1..5) %}
+        {% if i <= n %}★{% else %}☆{% endif %}
+      {% endfor %}
+    </div>
+
+    {% if rev.title.value %}<p><strong>{{ rev.title.value }}</strong></p>{% endif %}
+    {% if rev.body.value %}<p>{{ rev.body.value }}</p>{% endif %}
+    <small>
+      {% if rev.author.value %}by {{ rev.author.value }}{% endif %}
+      {% if rev.created.value %} • {{ rev.created.value | date: "%b %d, %Y" }}{% endif %}
+    </small>
+  </div>
+{% else %}
+  <em>Select a Review metaobject in this block’s settings.</em>
+{% endif %}
+
+{% schema %}
+{
+  "name": "App Reviews",
+  "target": "section",
+  "settings": [
+    {
+      "type": "metaobject",
+      "id": "review",
+      "label": "Review",
+      "metaobject_type": "review"
+    }
+  ]
+}
+{% endschema %}
