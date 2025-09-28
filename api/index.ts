@@ -1,5 +1,6 @@
-// api/index.ts — Vercel serverless entry for Admin Home + App Proxy
-import express, { Request, Response } from "express";
+// api/index.ts — Vercel serverless entry (no Prisma, dev-token only)
+import express from "express";
+import type { Request, Response } from "express";
 
 const app = express();
 
@@ -33,7 +34,7 @@ ${id ? `<p>Review ID: ${id}</p>` : ""}${message ? `<p><small>${message}</small><
 <script>location.replace(${JSON.stringify(returnTo)});</script>`);
 }
 
-// ---------- Admin Home (must exist so Admin preview works) ----------
+// ---------- Admin Home ----------
 app.get("/", (req, res) => {
   const shop = String(req.query.shop || "");
   const host = String(req.query.host || "");
@@ -68,7 +69,7 @@ function toProductGid(id: string | number) {
   return Number.isFinite(n) && n > 0 ? `gid://shopify/Product/${n}` : null;
 }
 
-// ---------- App Proxy target: /apps/app-reviews/submit → /reviews/submit ----------
+// ---------- App Proxy: /apps/app-reviews/submit → /reviews/submit ----------
 app.all("/reviews/submit", async (req: Request, res: Response) => {
   const shop =
     (req.query.shop as string) ||
@@ -81,27 +82,10 @@ app.all("/reviews/submit", async (req: Request, res: Response) => {
   try {
     if (!shop) return sendHtml(res, { ok: false, returnTo, message: "Missing shop" });
 
-    // DEV shortcut: use a Custom App Admin API token on *your dev store only*
-    let accessToken: string | undefined;
-    if (
-      process.env.DEV_SHOP_DOMAIN &&
-      process.env.DEV_ADMIN_TOKEN &&
-      shop === process.env.DEV_SHOP_DOMAIN
-    ) {
-      accessToken = process.env.DEV_ADMIN_TOKEN;
-    } else {
-      // Fallback for when you add OAuth later (reads Prisma session)
-      try {
-        const { PrismaClient } = await import("@prisma/client");
-        const prisma = new PrismaClient();
-        const session = await prisma.session.findFirst({ where: { shop, isOnline: false } });
-        accessToken = session?.accessToken;
-      } catch {
-        // Prisma not configured in this deploy — ignore
-      }
-    }
-
-    if (!accessToken) {
+    // Dev-store shortcut ONLY (no OAuth, no DB)
+    const devShop = process.env.DEV_SHOP_DOMAIN;
+    const devToken = process.env.DEV_ADMIN_TOKEN;
+    if (!devShop || !devToken || shop !== devShop) {
       return sendHtml(res, { ok: false, returnTo, message: "App not authorized for this shop" });
     }
 
@@ -117,7 +101,6 @@ app.all("/reviews/submit", async (req: Request, res: Response) => {
       return sendHtml(res, { ok: false, returnTo, message: "Rating must be 1..5" });
     }
 
-    // Create review metaobject (definition "review" must exist)
     const apiVersion = "2025-07";
     const mutation = `
       mutation($fields:[MetaobjectFieldInput!]!){
@@ -141,7 +124,7 @@ app.all("/reviews/submit", async (req: Request, res: Response) => {
     const r = await fetch(`https://${shop}/admin/api/${apiVersion}/graphql.json`, {
       method: "POST",
       headers: {
-        "X-Shopify-Access-Token": accessToken,
+        "X-Shopify-Access-Token": devToken,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({ query: mutation, variables })
@@ -149,11 +132,8 @@ app.all("/reviews/submit", async (req: Request, res: Response) => {
 
     const raw = await r.text();
     let json: any;
-    try {
-      json = JSON.parse(raw);
-    } catch {
-      return sendHtml(res, { ok: false, returnTo, message: "API returned non-JSON" });
-    }
+    try { json = JSON.parse(raw); }
+    catch { return sendHtml(res, { ok: false, returnTo, message: "API returned non-JSON" }); }
 
     const errs = json?.data?.metaobjectCreate?.userErrors ?? [];
     if (errs.length) {
@@ -167,7 +147,7 @@ app.all("/reviews/submit", async (req: Request, res: Response) => {
   }
 });
 
-// ---------- Export Vercel handler (no serverless-http needed) ----------
+// ---------- Export Vercel handler ----------
 export default function handler(req: any, res: any) {
   (app as any)(req, res);
 }
